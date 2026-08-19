@@ -1,0 +1,1341 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>SolarChat</title>
+<style>
+:root{
+  --bg:#09080d;--surface:#17151d;--surface2:#211e29;--line:#302c38;
+  --text:#f5f1fa;--muted:#aaa4b2;--accent:#c9a8ff;--accent2:#9b6cff;
+  --danger:#ff6b6b;--ok:#67e58a;--shadow:0 12px 35px rgba(0,0,0,.28);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+font-family:var(--solar-font,system-ui),system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body{overflow:hidden}
+button,input,textarea{font:inherit}
+button{border:0;color:inherit;cursor:pointer}
+.app{height:100dvh;display:flex;flex-direction:column;position:relative;overflow:hidden}
+.stars{position:fixed;inset:0;pointer-events:none;opacity:.65;z-index:0}
+.star{position:absolute;width:2px;height:2px;background:#fff;border-radius:50%;animation:twinkle 3s infinite alternate}
+@keyframes twinkle{from{opacity:.15;transform:scale(.7)}to{opacity:.9;transform:scale(1.35)}}
+
+header{position:relative;z-index:3;padding:calc(12px + env(safe-area-inset-top)) 22px 12px;
+background:rgba(9,8,13,.88);backdrop-filter:blur(16px);border-bottom:1px solid #201d26}
+h1{font-size:36px;line-height:1;margin:0 0 12px;font-weight:800;letter-spacing:-1.5px}
+.status{display:flex;gap:18px;flex-wrap:wrap;font-size:14px;font-weight:700;color:var(--muted)}
+.status span{display:flex;align-items:center;gap:8px}
+.dot{width:10px;height:10px;border-radius:50%;background:#777;box-shadow:0 0 10px currentColor}
+.dot.ok{background:var(--ok);color:var(--ok)}.dot.bad{background:var(--danger);color:var(--danger)}
+.dot.wait{background:#ffd166;color:#ffd166}
+
+.tabs{position:relative;z-index:2;display:grid;grid-template-columns:1fr 1fr;padding:18px 28px 12px}
+.tab{background:transparent;color:#c9c4cf;padding:15px;border-radius:32px;font-weight:800;font-size:21px}
+.tab.active{background:var(--accent);color:#241d30}
+main{position:relative;z-index:1;flex:1;min-height:0;overflow:hidden}
+.page{height:100%;display:none;overflow:auto;padding:0 22px 120px}
+.page.active{display:block}
+.chat-list{display:flex;flex-direction:column;gap:10px}
+.chat-item{padding:14px 16px;border:1px solid var(--line);border-radius:18px;background:rgba(27,24,34,.82);
+display:flex;align-items:center;gap:12px}
+.avatar{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:#7250b4;font-size:25px;flex:none}
+.chat-meta{min-width:0}.chat-name{font-weight:800}.chat-preview{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.empty{text-align:center;color:var(--muted);padding:70px 15px;font-weight:700;font-size:18px}
+
+.composer{position:absolute;z-index:4;left:0;right:0;bottom:70px;padding:10px 18px calc(10px + env(safe-area-inset-bottom));
+background:linear-gradient(transparent,rgba(9,8,13,.98) 25%)}
+.compose-row{display:flex;gap:8px;align-items:flex-end}
+.icon-btn{width:46px;height:46px;border-radius:50%;background:var(--surface2);display:grid;place-items:center;color:#eee9f5;border:1px solid rgba(255,255,255,.06);box-shadow:0 4px 14px rgba(0,0,0,.18);transition:.18s transform,.18s background,.18s box-shadow}.icon-btn:active{transform:scale(.92)}.icon-btn svg{width:23px;height:23px;stroke:currentColor;stroke-width:2.15;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.input-wrap{flex:1;display:flex;align-items:flex-end;background:var(--surface2);border:1px solid #332f3b;border-radius:23px;padding:5px 8px 5px 14px}
+#messageInput{flex:1;background:transparent;border:0;outline:0;color:var(--text);resize:none;max-height:120px;min-height:34px;padding:7px 5px}
+.send{width:46px;height:46px;border-radius:50%;background:var(--accent);color:#21182d;display:grid;place-items:center;box-shadow:0 5px 16px rgba(155,108,255,.28);transition:.18s transform,.18s filter}.send:active{transform:scale(.92)}.send svg{width:22px;height:22px;stroke:currentColor;stroke-width:2.4;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.attachment-preview{display:flex;gap:8px;overflow:auto;padding:5px 0}.preview{position:relative}
+.preview img{width:64px;height:64px;object-fit:cover;border-radius:12px}
+.remove{position:absolute;right:-4px;top:-4px;width:20px;height:20px;border-radius:50%;background:#000}
+
+.messages{height:100%;overflow:auto;padding:10px 0 145px}
+.message{display:flex;margin:8px 0}.message.mine{justify-content:flex-end}
+.bubble{max-width:min(78%,520px);padding:11px 13px;border-radius:18px;background:#24212b;border:1px solid #34303c}
+.mine .bubble{background:var(--accent);color:#21182d;border-color:transparent;border-bottom-right-radius:6px}
+.message:not(.mine) .bubble{border-bottom-left-radius:6px}
+.author{font-size:12px;font-weight:800;color:var(--muted);margin-bottom:3px}
+.mine .author{color:#5e4b72}
+.time{font-size:10px;opacity:.6;margin-top:5px;text-align:right}
+.msg-img{max-width:100%;max-height:300px;border-radius:12px;display:block}
+.file-link{display:block;text-decoration:none;color:inherit;padding:8px;border-radius:12px;background:rgba(0,0,0,.12)}
+
+.profile-card{max-width:620px;margin:15px auto;padding:25px;background:var(--surface);border:1px solid var(--line);
+border-radius:28px;box-shadow:var(--shadow)}
+.profile-avatar{width:120px;height:120px;margin:0 auto 20px;border-radius:50%;display:grid;place-items:center;background:#7250b4;font-size:60px}
+.field{margin:14px 0}.field label{display:block;color:var(--muted);font-size:14px;font-weight:800;margin:0 0 7px}
+.field input,.field textarea{width:100%;background:#232129;color:var(--text);border:1px solid #35313c;border-radius:16px;padding:14px;outline:0}
+.field textarea{min-height:100px;resize:vertical}
+.primary{width:100%;padding:14px;border-radius:16px;background:var(--accent);color:#21182d;font-weight:900}
+.emoji-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:8px}
+.emoji{background:#232129;border-radius:14px;padding:10px;font-size:24px}
+.emoji.selected{outline:2px solid var(--accent)}
+
+.people{display:flex;flex-direction:column;gap:9px}.person{padding:14px;border-radius:16px;background:var(--surface);border:1px solid var(--line);
+display:flex;align-items:center;gap:10px}.person button{margin-left:auto;background:var(--accent);color:#241d30;padding:8px 12px;border-radius:12px;font-weight:800}
+
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:20;display:none;align-items:flex-end}
+.modal.show{display:flex}.sheet{width:100%;max-height:82dvh;overflow:auto;background:#19171f;border-radius:26px 26px 0 0;padding:20px}
+.sheet h2{margin-top:0}.sheet-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.sheet button{padding:15px;border-radius:16px;background:#28242f;border:1px solid rgba(255,255,255,.06);font-weight:800}.sheet button:active{transform:scale(.985)}
+.hidden{display:none!important}
+.toast{position:fixed;left:20px;right:20px;bottom:90px;z-index:30;background:#292630;color:#fff;border:1px solid #3a3542;
+padding:15px 18px;border-radius:18px;box-shadow:var(--shadow);font-weight:800;transform:translateY(30px);opacity:0;pointer-events:none;transition:.2s}
+.toast.show{transform:none;opacity:1}
+
+nav{position:relative;z-index:5;height:70px;background:rgba(22,20,27,.97);border-top:1px solid #302c36;
+display:grid;grid-template-columns:repeat(4,1fr);padding-bottom:env(safe-area-inset-bottom)}
+nav button{background:transparent;color:#aaa4b2;font-weight:800;font-size:14px;display:flex;flex-direction:column;gap:5px;align-items:center;justify-content:center;position:relative;min-width:0}
+nav button .navicon{width:52px;height:32px;border-radius:18px;display:grid;place-items:center;transition:.2s;background:transparent}
+nav button .navicon svg{width:23px;height:23px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+nav button.active{color:var(--text)}nav button.active .navicon{background:var(--accent);color:#241d30}
+nav button:active .navicon{transform:scale(.94)}
+@media(min-width:700px){.page{padding-left:12%;padding-right:12%}.composer{left:10%;right:10%}}
+
+/* ===== Smooth Material-style motion ===== */
+:root{
+  --ease-standard:cubic-bezier(.2,.0,0,1);
+  --ease-emphasized:cubic-bezier(.2,.8,.2,1);
+  --ease-spring:cubic-bezier(.22,1.2,.36,1);
+}
+button,
+.tab,
+.navicon,
+.navicon svg,
+.icon-btn,
+.send,
+.chat-item,
+.emoji,
+.primary,
+.sheet button,
+.field input,
+.field textarea{
+  transition:
+    transform .32s var(--ease-spring),
+    opacity .24s ease,
+    background-color .28s var(--ease-standard),
+    color .28s var(--ease-standard),
+    border-color .28s var(--ease-standard),
+    box-shadow .32s var(--ease-standard),
+    filter .28s ease;
+  -webkit-tap-highlight-color:transparent;
+}
+
+button:active{
+  transform:scale(.965);
+}
+.icon-btn:active,
+.send:active{
+  transform:scale(.91);
+}
+.tab:active{
+  transform:scale(.975);
+}
+.chat-item:active{
+  transform:scale(.985);
+}
+
+.tab{
+  position:relative;
+  overflow:hidden;
+}
+.tab::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:inherit;
+  background:rgba(255,255,255,.12);
+  opacity:0;
+  transform:scale(.72);
+  transition:opacity .35s ease,transform .45s var(--ease-spring);
+  pointer-events:none;
+}
+.tab:active::after{
+  opacity:1;
+  transform:scale(1);
+}
+.tab.active{
+  transition:
+    background-color .42s var(--ease-standard),
+    color .32s var(--ease-standard),
+    transform .38s var(--ease-spring),
+    box-shadow .42s var(--ease-standard);
+  box-shadow:0 7px 22px rgba(155,108,255,.18);
+}
+
+.page{
+  animation:none;
+  will-change:opacity,transform;
+}
+.page.active{
+  display:block;
+  animation:pageEnter .42s var(--ease-emphasized) both;
+}
+@keyframes pageEnter{
+  from{opacity:0;transform:translateY(10px) scale(.992)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+
+.chat-item{
+  animation:contentRise .42s var(--ease-emphasized) both;
+}
+@keyframes contentRise{
+  from{opacity:0;transform:translateY(8px)}
+  to{opacity:1;transform:translateY(0)}
+}
+
+.message{
+  animation:messageIn .34s var(--ease-spring) both;
+  transform-origin:bottom left;
+}
+.message.mine{
+  transform-origin:bottom right;
+}
+@keyframes messageIn{
+  from{opacity:0;transform:translateY(8px) scale(.96)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+
+nav button{
+  transition:
+    color .3s var(--ease-standard),
+    transform .35s var(--ease-spring),
+    background-color .3s ease;
+}
+nav button .navicon{
+  transition:transform .38s var(--ease-spring);
+}
+nav button.active .navicon{
+  transform:translateY(-1px) scale(1.04);
+}
+nav button:active .navicon{
+  transform:scale(.9);
+}
+
+.icon-btn:hover,
+.send:hover,
+.primary:hover,
+.sheet button:hover,
+.chat-item:hover{
+  filter:brightness(1.07);
+}
+
+.emoji{
+  transform:translateZ(0);
+}
+.emoji.selected{
+  animation:emojiSelect .42s var(--ease-spring) both;
+}
+@keyframes emojiSelect{
+  0%{transform:scale(.82)}
+  65%{transform:scale(1.08)}
+  100%{transform:scale(1)}
+}
+
+.toast{
+  opacity:0;
+  transform:translateY(24px) scale(.97);
+  transition:
+    opacity .32s ease,
+    transform .42s var(--ease-spring);
+}
+.toast.show{
+  opacity:1;
+  transform:translateY(0) scale(1);
+}
+
+.modal{
+  display:flex;
+  visibility:hidden;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .32s ease,visibility 0s linear .32s;
+}
+.modal.show{
+  visibility:visible;
+  opacity:1;
+  pointer-events:auto;
+  transition:opacity .32s ease;
+}
+.sheet{
+  transform:translateY(34px);
+  opacity:.96;
+  transition:transform .46s var(--ease-spring),opacity .3s ease;
+}
+.modal.show .sheet{
+  transform:translateY(0);
+  opacity:1;
+}
+
+.field input:focus,
+.field textarea:focus{
+  border-color:rgba(201,168,255,.8);
+  box-shadow:0 0 0 4px rgba(201,168,255,.11);
+  transform:translateY(-1px);
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:.01ms!important;
+    animation-iteration-count:1!important;
+    transition-duration:.01ms!important;
+    scroll-behavior:auto!important;
+  }
+}
+
+
+/* ===== Registration + account switching ===== */
+.auth-screen{
+  position:fixed;inset:0;z-index:100;
+  display:grid;place-items:center;
+  padding:24px;
+  background:
+    radial-gradient(circle at 50% 15%,rgba(155,108,255,.18),transparent 34%),
+    rgba(9,8,13,.97);
+  backdrop-filter:blur(18px);
+  transition:opacity .5s var(--ease-emphasized),visibility .5s;
+}
+.auth-screen.leaving{
+  opacity:0;visibility:hidden;pointer-events:none;
+}
+.auth-card{
+  width:min(520px,100%);
+  padding:28px;
+  border:1px solid rgba(255,255,255,.09);
+  border-radius:30px;
+  background:rgba(27,24,34,.94);
+  box-shadow:0 25px 80px rgba(0,0,0,.45);
+  transform:translateY(0) scale(1);
+  animation:authCardIn .65s var(--ease-spring) both;
+}
+@keyframes authCardIn{
+  from{opacity:0;transform:translateY(22px) scale(.96)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+.auth-screen.leaving .auth-card{
+  animation:authCardOut .42s var(--ease-emphasized) both;
+}
+@keyframes authCardOut{
+  to{opacity:0;transform:translateY(-18px) scale(.98)}
+}
+.auth-logo{
+  width:72px;height:72px;margin:0 auto 18px;
+  display:grid;place-items:center;border-radius:24px;
+  background:linear-gradient(145deg,var(--accent),var(--accent2));
+  font-size:38px;box-shadow:0 12px 35px rgba(155,108,255,.25);
+}
+.auth-card h2{font-size:30px;text-align:center;margin:0 0 8px}
+.auth-card .auth-sub{text-align:center;color:var(--muted);margin:0 0 24px;line-height:1.45}
+.auth-name{
+  width:100%;padding:16px 17px;border-radius:17px;
+  background:#232129;color:var(--text);border:1px solid #3a3542;
+  outline:0;font-weight:700;font-size:17px;
+}
+.auth-name:focus{
+  border-color:rgba(201,168,255,.8);
+  box-shadow:0 0 0 4px rgba(201,168,255,.11);
+}
+.auth-submit{
+  width:100%;margin-top:12px;padding:16px;border-radius:17px;
+  background:var(--accent);color:#21182d;font-weight:900;font-size:16px;
+}
+.auth-hint{font-size:12px;color:var(--muted);text-align:center;margin:14px 0 0}
+.auth-submit.loading{pointer-events:none}
+.auth-submit.loading::after{
+  content:"";
+  display:inline-block;width:15px;height:15px;margin-left:9px;
+  vertical-align:-2px;border:2px solid currentColor;border-right-color:transparent;
+  border-radius:50%;animation:spin .7s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.account-row{
+  display:flex;align-items:center;gap:12px;
+  padding:12px;border-radius:17px;background:#232129;
+  border:1px solid #35313c;margin-bottom:8px;
+  transition:transform .32s var(--ease-spring),background-color .28s ease,border-color .28s ease;
+}
+.account-row:hover{transform:translateY(-1px);border-color:#4a4354}
+.account-info{min-width:0;flex:1}
+.account-info b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.account-info small{color:var(--muted)}
+.account-row button{
+  padding:9px 12px;border-radius:12px;background:var(--accent);
+  color:#241d30;font-weight:850;
+}
+.account-row.current{border-color:rgba(201,168,255,.65);box-shadow:0 0 0 2px rgba(201,168,255,.08) inset}
+.account-empty{color:var(--muted);padding:12px 0}
+.switch-account-btn{
+  width:100%;margin-top:12px;padding:13px;border-radius:15px;
+  background:#28242f;border:1px solid rgba(255,255,255,.06);font-weight:850;
+}
+.danger-account{background:rgba(255,107,107,.11)!important;color:#ff9a9a!important}
+
+
+/* ===== Message profile interaction ===== */
+.message .bubble{cursor:pointer}
+.message .bubble:hover{
+  transform:translateY(-1px);
+  box-shadow:0 8px 24px rgba(0,0,0,.16);
+}
+.message .bubble:active{transform:scale(.985)}
+.profile-sheet-user{
+  width:86px;height:86px;border-radius:50%;
+  display:grid;place-items:center;margin:2px auto 8px;
+  font-size:44px;background:#7250b4;
+  box-shadow:0 10px 28px rgba(0,0,0,.25);
+}
+.profile-sheet-name{text-align:center;font-size:24px;font-weight:850}
+.profile-sheet-bio{text-align:center;color:var(--muted);line-height:1.45;margin:8px 0 16px}
+.profile-sheet-username{
+  text-align:center;color:var(--muted);font-size:13px;margin-top:-8px;margin-bottom:14px
+}
+.profile-sheet-message{
+  width:100%;padding:15px;border-radius:16px;background:var(--accent);
+  color:#241d30;font-weight:900
+}
+
+
+/* ===== SolarChat typography ===== */
+:root{
+  --solar-font:"Manrope",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+html,body,button,input,textarea,select{
+  font-family:var(--solar-font);
+}
+body{
+  letter-spacing:-.01em;
+}
+h1,h2,h3,.auth-card h2,.profile-sheet-name{
+  letter-spacing:-.035em;
+}
+button{
+  font-weight:700;
+}
+input,textarea{
+  letter-spacing:-.01em;
+}
+.message .bubble{
+  line-height:1.48;
+}
+
+
+.private-chat-shell{
+  height:100%;
+  display:flex;
+  flex-direction:column;
+  min-height:0;
+}
+.private-chat-header{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:10px 4px 14px;
+  border-bottom:1px solid var(--border);
+  margin-bottom:10px;
+}
+.private-back{
+  width:42px;height:42px;border:0;border-radius:14px;
+  background:var(--card);color:var(--text);font-size:22px;
+  cursor:pointer;flex:0 0 auto;
+}
+.private-chat-avatar{
+  width:42px;height:42px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  background:#7650bd;font-size:22px;flex:0 0 auto;
+}
+.private-chat-user{min-width:0}
+.private-chat-name{
+  font-weight:800;font-size:17px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;
+}
+.private-chat-sub{
+  color:var(--muted);font-size:12px;margin-top:2px;
+}
+.private-chat-shell .messages{
+  flex:1 1 auto;min-height:0;height:auto;overflow:auto;padding-top:8px;padding-bottom:145px;
+}
+.private-chat-shell{overflow:hidden;}
+.private-chat-header{flex:0 0 auto;}
+.people-screen-list{min-height:0}
+
+
+/* ===== Optional theme + internet font controls ===== */
+.theme-font-card{margin-top:14px;padding:18px;border:1px solid var(--line);border-radius:22px;background:var(--surface)}
+.theme-font-card h3{margin:0 0 6px}.theme-font-card p{color:var(--muted);font-size:13px;margin:0 0 14px}
+.theme-font-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.theme-font-select,.theme-choice{width:100%;padding:13px;border-radius:15px;background:var(--surface2);color:var(--text);border:1px solid var(--line);outline:0}
+.theme-choice{font-weight:800}.theme-choice.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(201,168,255,.12) inset}
+@media(max-width:420px){.theme-font-grid{grid-template-columns:1fr}}
+.settings-card{max-width:720px;margin:15px auto;padding:20px;background:var(--surface);border:1px solid var(--line);border-radius:28px;box-shadow:var(--shadow)}
+.settings-hero{display:flex;gap:14px;align-items:center;padding:4px 2px 20px}.settings-hero-icon{width:56px;height:56px;border-radius:18px;background:var(--surface2);display:grid;place-items:center;font-size:28px}.settings-hero h2{margin:0 0 5px}.settings-hero p{margin:0;color:var(--muted);font-size:13px;line-height:1.45}
+.settings-section{padding:18px 0;border-top:1px solid var(--line)}.settings-section h3{margin:0 0 5px}.settings-muted{color:var(--muted);font-size:13px;margin:0 0 13px}.settings-theme-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.settings-theme{padding:14px;text-align:left;border:1px solid var(--line);border-radius:17px;background:var(--surface2);color:var(--text);display:grid;grid-template-columns:auto 1fr;column-gap:10px;align-items:center}.settings-theme span{grid-row:span 2;font-size:25px}.settings-theme b{font-size:14px}.settings-theme small{color:var(--muted);font-size:11px;margin-top:2px}.settings-theme.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(201,168,255,.12) inset}.settings-select{width:100%;padding:14px;border-radius:16px;background:var(--surface2);color:var(--text);border:1px solid var(--line);outline:0}.settings-row{display:flex;justify-content:space-between;gap:15px;padding:12px 0;border-bottom:1px solid var(--line);font-size:14px}.settings-row:last-child{border-bottom:0}.settings-row span{color:var(--muted)}.settings-reset{width:100%;padding:14px;border-radius:16px;background:rgba(255,107,107,.11);color:#ff9a9a;font-weight:850;border:1px solid rgba(255,107,107,.16)}
+@media(max-width:420px){.settings-theme-grid{grid-template-columns:1fr}.settings-card{margin-top:10px;padding:17px}}
+
+
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="auth-screen" id="authScreen">
+  <div class="auth-card">
+    <div class="auth-logo" aria-label="SolarChat logo">
+      <svg viewBox="0 0 64 64" width="44" height="44" aria-hidden="true">
+        <path d="M10 12h44a6 6 0 0 1 6 6v25a6 6 0 0 1-6 6H31l-11 8v-8H10a6 6 0 0 1-6-6V18a6 6 0 0 1 6-6Z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
+        <path d="M18 31h28M18 23h18" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+        <circle cx="48" cy="22" r="4" fill="currentColor"/>
+      </svg>
+    </div>
+    <h2>Добро пожаловать в SolarChat</h2>
+    <p class="auth-sub">Придумай никнейм — пароль и анонимная авторизация не нужны.</p>
+    <input id="registerUsername" class="auth-name" maxlength="32"
+           autocomplete="nickname" placeholder="Твой никнейм">
+    <button id="registerBtn" class="auth-submit">Войти в SolarChat</button>
+    <p class="auth-hint">Никнейм используется как имя профиля. Для настоящей защиты аккаунта позже можно добавить Firebase Authentication.</p>
+  </div>
+</div>
+
+<div class="app">
+<div class="stars" id="stars"></div>
+
+<header>
+  <h1 id="title">Чаты</h1>
+  <div class="status">
+    <span><i id="fbDot" class="dot wait"></i><b>Firebase:</b><span id="fbStatus">запуск...</span></span>
+    <span><i id="fsDot" class="dot wait"></i><b>Firestore:</b><span id="fsStatus">проверка...</span></span>
+  </div>
+</header>
+
+<div class="tabs" id="chatTabs">
+  <button class="tab active" data-chat="group">Группа</button>
+  <button class="tab" data-chat="private">Личные</button>
+</div>
+
+<main>
+  <section class="page active" id="groupPage">
+    <div class="messages" id="groupMessages"></div>
+  </section>
+
+  <section class="page" id="privatePage">
+    <div id="privatePeopleScreen" class="people-screen-list">
+      <div id="people" class="people"></div>
+    </div>
+
+    <div id="privateChatScreen" class="private-chat-shell hidden">
+      <div class="private-chat-header">
+        <button id="privateBackBtn" class="private-back" aria-label="Назад">←</button>
+        <div id="privateChatAvatar" class="private-chat-avatar">😀</div>
+        <div class="private-chat-user">
+          <div id="privateChatName" class="private-chat-name">Личный чат</div>
+          <div id="privateChatStatus" class="private-chat-sub">личные сообщения</div>
+        </div>
+      </div>
+      <div id="privateMessages" class="messages"></div>
+    </div>
+  </section>
+
+  <section class="page" id="peoplePage">
+    <div class="field"><input id="peopleSearch" placeholder="Поиск по никнейму..."></div>
+    <div class="people" id="peopleList"></div>
+  </section>
+
+  <section class="page" id="settingsPage">
+    <div class="settings-card">
+      <div class="settings-hero"><div class="settings-hero-icon">⚙️</div><div><h2>Настройки</h2><p>Персонализируй SolarChat. Настройки интерфейса сохраняются на этом устройстве.</p></div></div>
+      <div class="settings-section"><h3>🎨 Внешний вид</h3><p class="settings-muted">Выбери оформление приложения.</p>
+        <div class="settings-theme-grid">
+          <button id="settingsThemeSystem" class="settings-theme" type="button"><span>🖥️</span><b>Системная</b><small>По теме устройства</small></button>
+          <button id="settingsThemeDark" class="settings-theme" type="button"><span>🌙</span><b>Тёмная</b><small>Классическая SolarChat</small></button>
+          <button id="settingsThemeLight" class="settings-theme" type="button"><span>☀️</span><b>Светлая</b><small>Светлый интерфейс</small></button>
+          <button id="settingsThemeMidnight" class="settings-theme" type="button"><span>🌌</span><b>Полночь</b><small>Синий тёмный режим</small></button>
+          <button id="settingsThemeOcean" class="settings-theme" type="button"><span>🌊</span><b>Океан</b><small>Бирюзовая тема</small></button>
+        </div>
+      </div>
+      <div class="settings-section"><h3>🔤 Шрифт</h3><p class="settings-muted">Измени шрифт всего интерфейса.</p>
+        <select id="settingsFontSelect" class="settings-select" aria-label="Шрифт в настройках">
+          <option value="Manrope">Manrope</option><option value="Inter">Inter</option><option value="Roboto">Roboto</option><option value="Nunito">Nunito</option><option value="Montserrat">Montserrat</option><option value="Rubik">Rubik</option><option value="Playfair Display">Playfair Display</option>
+        </select>
+      </div>
+      <div class="settings-section"><h3>ℹ️ О приложении</h3>
+        <div class="settings-row"><span>Приложение</span><b>SolarChat</b></div><div class="settings-row"><span>Версия</span><b id="appVersion">1.0.0</b></div><div class="settings-row"><span>Сборка</span><b>Web / HTML</b></div>
+      </div>
+      <button id="resetSettingsBtn" class="settings-reset" type="button">↺ Сбросить настройки</button>
+    </div>
+  </section>
+
+  <section class="page" id="profilePage">
+    <div class="profile-card">
+      <div id="profileAvatar" class="profile-avatar">😀</div>
+      <div class="field"><label>Имя / username</label><input id="username" maxlength="32" placeholder="Например: Алексей"></div>
+      <div class="field"><label>О себе</label><textarea id="about" maxlength="250" placeholder="О себе..."></textarea></div>
+      <div class="field"><label>Аватар</label><div id="emojiGrid" class="emoji-grid"></div></div>
+      <button id="saveProfile" class="primary">Сохранить профиль</button>
+      <button id="switchAccountBtn" class="switch-account-btn">⇄ Сменить аккаунт</button>
+
+      <p style="color:var(--muted);font-size:13px;margin-bottom:0">
+        Вход выполняется просто по никнейму — без анонимной авторизации.
+        Аккаунты можно переключать из этого профиля.
+      </p>
+    </div>
+  </section>
+</main>
+
+<div class="composer" id="composer">
+  <div id="attachmentPreview" class="attachment-preview hidden"></div>
+  <div class="compose-row">
+    <button class="icon-btn" id="attachBtn" title="Фото или файл" aria-label="Фото или файл"><svg viewBox="0 0 24 24"><path d="m21.4 11.6-8.7 8.7a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 1 1-2.8-2.8l8.5-8.5"/></svg></button>
+    <button class="icon-btn" id="emojiBtn" title="Emoji и стикеры" aria-label="Emoji и стикеры"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01M15 9h.01"/></svg></button>
+    <div class="input-wrap">
+      <textarea id="messageInput" rows="1" placeholder="Сообщение..."></textarea>
+      <button class="send" id="sendBtn" aria-label="Отправить"><svg viewBox="0 0 24 24"><path d="M4 12 20 4l-4 16-4.5-6L4 12Z"/><path d="M11.5 14 20 4"/></svg></button>
+    </div>
+  </div>
+  <input id="fileInput" type="file" accept="image/*,.pdf,.txt,.zip,.doc,.docx" multiple class="hidden">
+</div>
+
+<nav>
+  <button class="active" data-page="chats"><span class="navicon"><svg viewBox="0 0 24 24"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H11l-4.5 3V17H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/><path d="M7 9h10M7 12h7"/></svg></span>Чаты</button>
+  <button data-page="people"><span class="navicon"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 19c.6-3 2.6-5 6-5s5.4 2 6 5"/><path d="M16 6.5a3 3 0 0 1 0 5.8M17 14c2.2.3 3.6 1.9 4 4"/></svg></span>Люди</button>
+  <button data-page="profile"><span class="navicon"><svg viewBox="0 0 24 24"><path d="M12 3.5 13.4 5a7.9 7.9 0 0 1 2 .8l2-.5 1.7 1.7-.5 2a7.9 7.9 0 0 1 .8 2l1.5 1.4v2.4l-1.5 1.4a7.9 7.9 0 0 1-.8 2l.5 2-1.7 1.7-2-.5a7.9 7.9 0 0 1-2 .8L12 20.5l-2.4-1.4a7.9 7.9 0 0 1-2-.8l-2 .5-1.7-1.7.5-2a7.9 7.9 0 0 1-.8-2L2.1 11.7V9.3l1.5-1.4a7.9 7.9 0 0 1 .8-2l-.5-2L5.6 2.2l2 .5a7.9 7.9 0 0 1 2-.8L12 3.5Z"/><circle cx="12" cy="10.5" r="2.5"/><path d="M8.5 16c1-1.3 2.2-2 3.5-2s2.5.7 3.5 2"/></svg></span>Профиль</button>
+  <button data-page="settings"><span class="navicon"><svg viewBox="0 0 24 24"><path d="M12 3.5 13.4 5a7.9 7.9 0 0 1 2 .8l2-.5 1.7 1.7-.5 2a7.9 7.9 0 0 1 .8 2l1.5 1.4v2.4l-1.5 1.4a7.9 7.9 0 0 1-.8 2l.5 2-1.7 1.7-2-.5a7.9 7.9 0 0 1-2 .8L12 20.5l-2.4-1.4a7.9 7.9 0 0 1-2-.8l-2 .5-1.7-1.7.5-2a7.9 7.9 0 0 1-.8-2L2.1 11.7V9.3l1.5-1.4a7.9 7.9 0 0 1 .8-2l-.5-2L5.6 2.2l2 .5a7.9 7.9 0 0 1 2-.8L12 3.5Z"/><circle cx="12" cy="12" r="3"/></svg></span>Настройки</button>
+</nav>
+
+<div class="modal" id="emojiModal">
+  <div class="sheet">
+    <h2>Emoji и стикеры</h2>
+    <div id="modalEmojiGrid" class="emoji-grid"></div>
+    <hr style="border-color:#332f38;margin:20px 0">
+    <h3>Добавить свой стикер</h3>
+    <p style="color:var(--muted)">Выбери изображение из галереи. Оно будет вставлено в сообщение как картинка. Для постоянного хранения файлов Firebase Storage должен быть включён.</p>
+    <button id="stickerGallery" style="width:100%"><svg viewBox="0 0 24 24" style="width:20px;height:20px;vertical-align:-4px;margin-right:7px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9" r="1.5"/><path d="m21 15-4.5-4.5L9 18l-2.5-2.5L3 19"/></svg>Выбрать изображение</button>
+    <button id="closeEmoji" style="width:100%;margin-top:8px"><svg viewBox="0 0 24 24" style="width:19px;height:19px;vertical-align:-4px;margin-right:7px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round"><path d="m6 6 12 12M18 6 6 18"/></svg>Закрыть</button>
+  </div>
+</div>
+
+
+<div class="modal" id="accountModal">
+  <div class="sheet">
+    <h2>Сменить аккаунт</h2>
+    <div id="accountList"></div>
+    <button id="newAccountBtn" class="switch-account-btn">＋ Добавить аккаунт</button>
+    <button id="closeAccountModal" class="switch-account-btn">Закрыть</button>
+  </div>
+</div>
+
+
+<div class="modal" id="messageProfileModal">
+  <div class="sheet">
+    <div id="messageProfileAvatar" class="profile-sheet-user">😀</div>
+    <div id="messageProfileName" class="profile-sheet-name">Пользователь</div>
+    <div id="messageProfileUsername" class="profile-sheet-username">@пользователь</div>
+    <div id="messageProfileBio" class="profile-sheet-bio">О себе пока ничего нет.</div>
+    <div class="sheet-actions">
+      <button id="messageProfileWrite" class="profile-sheet-message">💬 Написать</button>
+      <button id="messageProfileClose">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+import {
+  getFirestore, collection, addDoc, doc, setDoc, getDoc, getDocs,
+  query, orderBy, limit, onSnapshot, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+
+/* ТВОЯ КОНФИГУРАЦИЯ FIREBASE */
+const firebaseConfig = {
+  apiKey: "AIzaSyCwv2ZRCJFVZPV1bAfVEdU1azvdBRu0VyU",
+  authDomain: "solarchat-l.firebaseapp.com",
+  projectId: "solarchat-l",
+  storageBucket: "solarchat-l.firebasestorage.app",
+  messagingSenderId: "248198337762",
+  appId: "1:248198337762:web:5f7d45dd25569581defabb"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+/* Никакого signInAnonymously здесь нет. */
+const emojis = [
+"😀","😃","😄","😁","😆","😅","😂","🤣",
+"😊","😇","🙂","🙃","😉","😌","😍","🥰",
+"😘","😗","😙","😚","😋","😛","😝","😜",
+"🤪","🤨","🧐","🤓","😎","🥳","🤩","😏",
+"😒","😞","😔","😟","😕","🙁","☹️","😣",
+"😖","😫","😩","🥺","😢","😭","😤","😠",
+"😡","🤬","🤔","🤭","🤫","🤥","😶","😐",
+"😑","😬","🙄","😯","😦","😧","😮","😲",
+"🥱","😴","🤤","😪","😵","🤯","🤠","🤡",
+"👻","💀","☠️","👽","🤖","🔥","❤️","👍",
+"👎","👏","🙏","💯","✨","🚀","🌎","🎉"
+];
+
+let profile = JSON.parse(localStorage.getItem("solarchat_profile") || "null") || {
+  username:"", about:"", avatar:"😀"
+};
+let accounts = JSON.parse(localStorage.getItem("solarchat_accounts") || "[]");
+if(profile.username && !accounts.some(a=>a.username===profile.username)){
+  accounts.unshift({...profile});
+  localStorage.setItem("solarchat_accounts",JSON.stringify(accounts));
+}
+let currentChat = "group";
+let currentPrivateUser = null;
+let unsubscribeGroup = null;
+let unsubscribePrivate = null;
+let selectedFiles = [];
+let openedMessageProfile = null;
+
+
+/* ---------- accounts / registration ---------- */
+function saveAccounts(){
+  localStorage.setItem("solarchat_accounts",JSON.stringify(accounts.slice(0,12)));
+}
+function saveCurrentProfile(){
+  localStorage.setItem("solarchat_profile",JSON.stringify(profile));
+}
+function normalizeUsername(value){
+  return value.trim().replace(/\s+/g," ").slice(0,32);
+}
+function rememberAccount(p){
+  const clean={username:p.username,about:p.about||"",avatar:p.avatar||"😀"};
+  accounts=[clean,...accounts.filter(a=>a.username.toLowerCase()!==clean.username.toLowerCase())].slice(0,12);
+  saveAccounts();
+}
+function showAuth(){
+  $("authScreen").classList.remove("leaving");
+  $("registerUsername").value=profile.username||"";
+  setTimeout(()=>$("registerUsername").focus(),80);
+}
+function enterAppAnimated(){
+  const screen=$("authScreen");
+  screen.classList.add("leaving");
+  setTimeout(()=>{
+    openPage("chats");
+    currentChat="group";
+    document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x.dataset.chat==="group"));
+    $("groupPage").classList.add("active");
+    $("privatePage").classList.remove("active");
+    if(!unsubscribeGroup) startGroupListener();
+  },220);
+}
+async function registerByUsername(){
+  const btn=$("registerBtn");
+  const username=normalizeUsername($("registerUsername").value);
+  if(username.length<2) return toast("Никнейм должен быть минимум 2 символа");
+  if(username.length>32) return toast("Никнейм слишком длинный");
+
+  btn.classList.add("loading");
+  btn.textContent="Подключаемся";
+  try{
+    const existing=await getDoc(doc(db,"users",username));
+    if(existing.exists()){
+      const data=existing.data();
+      profile={
+        username:data.username||username,
+        about:data.about||"",
+        avatar:data.avatar||"😀"
+      };
+    }else{
+      profile={username,about:"",avatar:"😀"};
+      await setDoc(doc(db,"users",username),{
+        username,about:"",avatar:"😀",updatedAt:serverTimestamp()
+      },{merge:true});
+    }
+  }catch(e){
+    console.error(e);
+    /* Регистрация не блокируется из-за временной ошибки Firestore. */
+    profile={...profile,username};
+    toast("Ник сохранён. Firestore можно синхронизировать позже.");
+  }
+
+  saveCurrentProfile();
+  rememberAccount(profile);
+  await loadProfile();
+  renderPeople();
+
+  btn.classList.remove("loading");
+  btn.textContent="Войти в SolarChat";
+  enterAppAnimated();
+}
+function renderAccountList(){
+  const box=$("accountList");
+  if(!accounts.length){
+    box.innerHTML='<div class="account-empty">Сохранённых аккаунтов пока нет.</div>';
+    return;
+  }
+  box.innerHTML="";
+  accounts.forEach(a=>{
+    const row=document.createElement("div");
+    row.className="account-row"+(a.username===profile.username?" current":"");
+    row.innerHTML=`<div class="avatar">${esc(a.avatar||"😀")}</div>
+      <div class="account-info"><b>${esc(a.username)}</b><small>${a.username===profile.username?"Текущий аккаунт":"Сохранённый аккаунт"}</small></div>`;
+    const b=document.createElement("button");
+    b.textContent=a.username===profile.username?"Текущий":"Войти";
+    b.disabled=a.username===profile.username;
+    if(!b.disabled) b.onclick=()=>switchAccount(a.username);
+    row.appendChild(b);
+    box.appendChild(row);
+  });
+}
+async function switchAccount(username){
+  const saved=accounts.find(a=>a.username===username);
+  if(!saved) return;
+  if(unsubscribePrivate){unsubscribePrivate();unsubscribePrivate=null}
+  currentPrivateUser=null;
+  try{
+    const snap=await getDoc(doc(db,"users",username));
+    profile=snap.exists()
+      ? {username,about:snap.data().about||saved.about||"",avatar:snap.data().avatar||saved.avatar||"😀"}
+      : {...saved};
+  }catch(e){
+    profile={...saved};
+  }
+  saveCurrentProfile();
+  rememberAccount(profile);
+  await loadProfile();
+  renderAccountList();
+  $("accountModal").classList.remove("show");
+  toast("Аккаунт переключён");
+  requestAnimationFrame(()=>{
+    document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
+    $("groupPage").classList.add("active");
+    currentChat="group";
+    document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x.dataset.chat==="group"));
+    openPage("chats");
+    startGroupListener();
+  });
+}
+
+/* ---------- UI helpers ---------- */
+const $ = id => document.getElementById(id);
+function toast(text){
+  $("toast").textContent=text;$("toast").classList.add("show");
+  clearTimeout(window.__toast);window.__toast=setTimeout(()=>$("toast").classList.remove("show"),2600);
+}
+function setStatus(type, state, text){
+  const dot = type==="fb" ? $("fbDot") : $("fsDot");
+  const label = type==="fb" ? $("fbStatus") : $("fsStatus");
+  dot.className="dot "+state; label.textContent=text;
+}
+function requireUsername(){
+  if(!profile.username.trim()){
+    toast("Сначала укажи username в профиле");
+    openPage("profile"); $("username").focus(); return false;
+  }
+  return true;
+}
+function esc(s){
+  return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+}
+function timeOf(ts){
+  if(!ts) return "";
+  const d=ts.toDate?ts.toDate():new Date(ts);
+  return d.toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"});
+}
+
+/* ---------- stars ---------- */
+for(let i=0;i<70;i++){
+  const s=document.createElement("i");s.className="star";
+  s.style.left=Math.random()*100+"%";s.style.top=Math.random()*100+"%";
+  s.style.animationDelay=(Math.random()*3)+"s";
+  $("stars").appendChild(s);
+}
+
+/* ---------- profile ---------- */
+function renderEmojiGrid(){
+  const grids=[$("emojiGrid"),$("modalEmojiGrid")];
+  grids.forEach(grid=>{
+    grid.innerHTML="";
+    emojis.forEach(e=>{
+      const b=document.createElement("button");b.className="emoji"+(profile.avatar===e?" selected":"");
+      b.textContent=e;
+      b.onclick=()=>{
+        profile.avatar=e; $("profileAvatar").textContent=e;
+        grid.querySelectorAll(".emoji").forEach(x=>x.classList.remove("selected"));b.classList.add("selected");
+      };
+      grid.appendChild(b);
+    });
+  });
+}
+async function loadProfile(){
+  $("username").value=profile.username||"";
+  $("about").value=profile.about||"";
+  $("profileAvatar").textContent=profile.avatar||"😀";
+  renderEmojiGrid();
+}
+$("saveProfile").onclick=async()=>{
+  const username=$("username").value.trim();
+  const about=$("about").value.trim();
+  if(!username) return toast("Введите username");
+  if(username.length<2) return toast("Username слишком короткий");
+  profile={...profile,username,about};
+  saveCurrentProfile();
+  rememberAccount(profile);
+
+  /* Документ профиля хранится под username. Это НЕ уникальный ID пользователя,
+     а просто имя документа, выбранное самим человеком. */
+  try{
+    await setDoc(doc(db,"users",username),{
+      username,about,avatar:profile.avatar||"😀",updatedAt:serverTimestamp()
+    },{merge:true});
+    toast("Профиль сохранён");
+    renderPeople();
+  }catch(e){
+    console.error(e); toast("Профиль локально сохранён, Firestore отклонил запись");
+  }
+};
+
+
+/* ---------- registration + account switch UI ---------- */
+$("registerBtn").onclick=registerByUsername;
+$("registerUsername").addEventListener("keydown",e=>{
+  if(e.key==="Enter"){e.preventDefault();registerByUsername()}
+});
+$("switchAccountBtn").onclick=()=>{
+  renderAccountList();
+  $("accountModal").classList.add("show");
+};
+$("closeAccountModal").onclick=()=>$("accountModal").classList.remove("show");
+$("accountModal").onclick=e=>{
+  if(e.target===$("accountModal"))$("accountModal").classList.remove("show");
+};
+$("newAccountBtn").onclick=()=>{
+  $("accountModal").classList.remove("show");
+  $("registerUsername").value="";
+  $("authScreen").classList.remove("leaving");
+  $("registerBtn").textContent="Войти в SolarChat";
+  $("registerBtn").classList.remove("loading");
+  $("registerUsername").focus();
+};
+
+
+/* ---------- navigation ---------- */
+function openPage(page){
+  document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
+  document.querySelectorAll("nav button").forEach(x=>x.classList.remove("active"));
+  const p=page==="chats"?(currentChat==="group"?"groupPage":"privatePage"):page+"Page";
+  $(p)?.classList.add("active");
+  document.querySelector(`nav button[data-page="${page}"]`)?.classList.add("active");
+  $("composer").classList.toggle("hidden",page!=="chats");
+  $("chatTabs").classList.toggle("hidden",page!=="chats");
+  $("title").textContent=page==="profile"?"Профиль":page==="people"?"Люди":page==="settings"?"Настройки":"Чаты";
+}
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>openPage(b.dataset.page));
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{
+  currentChat=b.dataset.chat;
+  document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===b));
+  requestAnimationFrame(staggerVisibleContent);
+  if(currentChat==="group"){
+    $("groupPage").classList.add("active");$("privatePage").classList.remove("active");
+    currentPrivateUser=null;startGroupListener();
+  }else{
+    if(unsubscribePrivate){unsubscribePrivate();unsubscribePrivate=null;}
+    showPrivatePeopleScreen();
+    renderPeople();
+  }
+});
+
+
+/* ---------- smooth list entrance ---------- */
+function staggerVisibleContent(){
+  document.querySelectorAll(".page.active .chat-item, .page.active .message").forEach((el,i)=>{
+    el.style.animationDelay = Math.min(i * 35, 280) + "ms";
+  });
+}
+const _openPage = openPage;
+openPage = function(page){
+  _openPage(page);
+  requestAnimationFrame(staggerVisibleContent);
+};
+const _renderEmojiGrid = renderEmojiGrid;
+renderEmojiGrid = function(){
+  _renderEmojiGrid();
+  requestAnimationFrame(()=>{
+    document.querySelectorAll(".emoji").forEach((el,i)=>{
+      el.style.animationDelay = Math.min(i * 12, 180) + "ms";
+    });
+  });
+};
+
+/* ---------- messages ---------- */
+function renderMessage(data, mine){
+  const el=document.createElement("div");el.className="message"+(mine?" mine":"");
+  const b=document.createElement("div");b.className="bubble";
+  if(!mine && data.username){
+    b.title="Открыть профиль";
+    b.addEventListener("click",()=>openMessageProfile(data.username));
+  }
+  const author=document.createElement("div");author.className="author";author.textContent=data.username||"Без имени";
+  b.appendChild(author);
+  if(data.text){const t=document.createElement("div");t.textContent=data.text;b.appendChild(t)}
+  if(data.imageData){
+    const img=document.createElement("img");img.className="msg-img";img.src=data.imageData;img.alt="изображение";b.appendChild(img);
+  }
+  if(data.fileName && !data.imageData){
+    const a=document.createElement("div");a.className="file-link";a.textContent="📎 "+data.fileName;
+    b.appendChild(a);
+  }
+  const tm=document.createElement("div");tm.className="time";tm.textContent=timeOf(data.createdAt);b.appendChild(tm);
+  el.appendChild(b);return el;
+}
+function drawMessages(container, docs){
+  container.innerHTML="";
+  docs.forEach(d=>{
+    const x=d.data();container.appendChild(renderMessage(x,x.username===profile.username));
+  });
+  container.scrollTop=container.scrollHeight;
+}
+
+function startGroupListener(){
+  if(unsubscribeGroup) unsubscribeGroup();
+  const q=query(collection(db,"messages"),orderBy("createdAt","asc"),limit(200));
+  unsubscribeGroup=onSnapshot(q,
+    snap=>{
+      setStatus("fs","ok","работает");
+      if(currentChat==="group") drawMessages($("groupMessages"),snap.docs);
+    },
+    err=>{
+      console.error(err);
+      setStatus("fs","bad","ошибка");
+      toast("Firestore: "+(err.code||"ошибка доступа"));
+    }
+  );
+}
+
+/* Личные сообщения используют два username в имени комнаты.
+   Сам username вводит человек; отдельный UID аккаунта не используется. */
+function privateRoom(a,b){
+  return [a,b].sort((x,y)=>x.localeCompare(y)).join("__");
+}
+function showPrivatePeopleScreen(){
+  $("groupPage").classList.remove("active");
+  $("privatePage").classList.add("active");
+  $("privatePeopleScreen").classList.remove("hidden");
+  $("privateChatScreen").classList.add("hidden");
+  $("privateMessages").innerHTML="";
+  currentPrivateUser=null;
+}
+
+async function showPrivateChatScreen(other){
+  if(!requireUsername()) return;
+  currentPrivateUser=other;
+  $("groupPage").classList.remove("active");
+  $("privatePage").classList.add("active");
+  $("privatePeopleScreen").classList.add("hidden");
+  $("privateChatScreen").classList.remove("hidden");
+
+  let u={username:other,avatar:"😀",about:""};
+  try{
+    const snap=await getDoc(doc(db,"users",other));
+    if(snap.exists()) u={...u,...snap.data()};
+  }catch(e){}
+
+  $("privateChatAvatar").textContent=u.avatar||"😀";
+  $("privateChatName").textContent=u.username||other;
+  $("privateChatStatus").textContent=u.about||"личные сообщения";
+}
+
+$("privateBackBtn").onclick=()=>{
+  if(unsubscribePrivate){unsubscribePrivate();unsubscribePrivate=null;}
+  showPrivatePeopleScreen();
+  renderPeople();
+};
+
+async function startPrivateListener(other){
+  if(!requireUsername()) return;
+  if(unsubscribePrivate) { unsubscribePrivate(); unsubscribePrivate=null; }
+  await showPrivateChatScreen(other);
+  const room=privateRoom(profile.username,other);
+  const q=query(collection(db,"privateRooms",room,"messages"),orderBy("createdAt","asc"),limit(200));
+  unsubscribePrivate=onSnapshot(q,
+    snap=>{
+      drawMessages($("privateMessages"),snap.docs);
+      requestAnimationFrame(()=>{
+        const box=$("privateMessages");
+        box.scrollTop=box.scrollHeight;
+      });
+    },
+    err=>{console.error(err);toast("Личные сообщения: "+(err.code||"ошибка"))}
+  );
+}
+async function sendMessage(){
+  if(!requireUsername()) return;
+  const text=$("messageInput").value.trim();
+  if(!text && !selectedFiles.length) return;
+  try{
+    if(currentChat==="group"){
+      await addDoc(collection(db,"messages"),{
+        username:profile.username,text,
+        avatar:profile.avatar||"😀",
+        createdAt:serverTimestamp()
+      });
+    }else{
+      if(!currentPrivateUser) return toast("Выбери человека");
+      const room=privateRoom(profile.username,currentPrivateUser);
+      await addDoc(collection(db,"privateRooms",room,"messages"),{
+        username:profile.username,text,
+        avatar:profile.avatar||"😀",
+        createdAt:serverTimestamp()
+      });
+    }
+    $("messageInput").value="";selectedFiles=[];renderPreviews();
+  }catch(e){
+    console.error(e);toast("Не удалось отправить: "+(e.code||"ошибка"));
+  }
+}
+$("sendBtn").onclick=sendMessage;
+$("messageInput").addEventListener("keydown",e=>{
+  if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendMessage()}
+});
+$("messageInput").addEventListener("input",()=>{
+  const x=$("messageInput");x.style.height="auto";x.style.height=Math.min(x.scrollHeight,120)+"px";
+});
+
+/* ---------- people ---------- */
+async function renderPeople(){
+  const box=$("people"),list=$("peopleList");
+  box.innerHTML="Загрузка...";
+  list.innerHTML="Загрузка...";
+  try{
+    const snap=await getDocs(query(collection(db,"users"),limit(100)));
+    const html=snap.docs.map(d=>{
+      const u=d.data();return `<div class="person"><div class="avatar">${esc(u.avatar||"😀")}</div><div><b>${esc(u.username||d.id)}</b><div style="color:var(--muted);font-size:12px">${esc(u.about||"")}</div></div><button data-user="${esc(u.username||d.id)}">Написать</button></div>`;
+    }).join("") || `<div class="empty">Пока нет профилей</div>`;
+    box.innerHTML=html;list.innerHTML=html;
+    [box,list].forEach(parent=>parent.querySelectorAll("button[data-user]").forEach(b=>b.onclick=()=>{
+      currentChat="private";
+      document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x.dataset.chat==="private"));
+      openPage("chats");
+      $("groupPage").classList.remove("active");
+      $("privatePage").classList.add("active");
+      startPrivateListener(b.dataset.user);
+    }));
+  }catch(e){
+    box.innerHTML=list.innerHTML=`<div class="empty">Не удалось загрузить пользователей</div>`;
+  }
+}
+
+
+$("peopleSearch").addEventListener("input",()=>{
+  const q=$("peopleSearch").value.trim().toLowerCase();
+  $("peopleList").querySelectorAll(".person").forEach(row=>{
+    row.style.display=row.textContent.toLowerCase().includes(q)?"":"none";
+  });
+});
+
+
+/* ---------- profile from message ---------- */
+async function openMessageProfile(username){
+  if(!username) return;
+  openedMessageProfile=username;
+
+  let data={username,avatar:"😀",about:""};
+  try{
+    const snap=await getDoc(doc(db,"users",username));
+    if(snap.exists()) data={...data,...snap.data()};
+  }catch(e){
+    console.warn("Не удалось загрузить профиль:",e);
+  }
+
+  $("messageProfileAvatar").textContent=data.avatar||"😀";
+  $("messageProfileName").textContent=data.username||username;
+  $("messageProfileUsername").textContent="@"+(data.username||username);
+  $("messageProfileBio").textContent=data.about||"О себе пока ничего нет.";
+
+  $("messageProfileModal").classList.add("show");
+}
+$("messageProfileClose").onclick=()=>$("messageProfileModal").classList.remove("show");
+$("messageProfileModal").onclick=e=>{
+  if(e.target===$("messageProfileModal"))$("messageProfileModal").classList.remove("show");
+};
+$("messageProfileWrite").onclick=()=>{
+  const username=openedMessageProfile;
+  if(!username) return;
+  if(username===profile.username){
+    $("messageProfileModal").classList.remove("show");
+    return toast("Это твой собственный профиль");
+  }
+
+  $("messageProfileModal").classList.remove("show");
+  currentChat="private";
+  currentPrivateUser=username;
+  document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x.dataset.chat==="private"));
+  openPage("chats");
+  $("groupPage").classList.remove("active");
+  $("privatePage").classList.add("active");
+  startPrivateListener(username);
+};
+
+
+/* ---------- files / stickers ---------- */
+/* Storage сейчас не нужен для обычного текста.
+   Если Firebase Storage у проекта недоступен, изображение ниже можно отправить
+   как временный data URL, но большие файлы в Firestore отправлять НЕ стоит. */
+$("attachBtn").onclick=()=>$("fileInput").click();
+$("stickerGallery").onclick=()=>$("fileInput").click();
+$("fileInput").onchange=e=>{
+  selectedFiles=[...e.target.files].slice(0,4);renderPreviews();
+  $("emojiModal").classList.remove("show");
+};
+function renderPreviews(){
+  const box=$("attachmentPreview");box.innerHTML="";
+  if(!selectedFiles.length){box.classList.add("hidden");return}
+  box.classList.remove("hidden");
+  selectedFiles.forEach((f,i)=>{
+    const p=document.createElement("div");p.className="preview";
+    if(f.type.startsWith("image/")){
+      const img=document.createElement("img");img.src=URL.createObjectURL(f);p.appendChild(img);
+    }else{
+      p.textContent="📎 "+f.name;
+    }
+    const x=document.createElement("button");x.className="remove";x.textContent="×";
+    x.onclick=()=>{selectedFiles.splice(i,1);renderPreviews()};p.appendChild(x);box.appendChild(p);
+  });
+}
+$("emojiBtn").onclick=()=>{
+  $("modalEmojiGrid").querySelectorAll(".emoji").forEach(b=>b.onclick=()=>{
+    $("messageInput").value+=b.textContent;$("messageInput").focus();$("emojiModal").classList.remove("show");
+  });
+  $("emojiModal").classList.add("show");
+};
+$("closeEmoji").onclick=()=>$("emojiModal").classList.remove("show");
+$("emojiModal").onclick=e=>{if(e.target===$("emojiModal"))$("emojiModal").classList.remove("show")};
+
+/* ---------- Firebase status ---------- */
+async function boot(){
+  setStatus("fb","ok","подключён");
+  try{
+    /* Один короткий запрос вместо бесконечного "подключения". */
+    await getDocs(query(collection(db,"users"),limit(1)));
+    setStatus("fs","ok","работает");
+    startGroupListener();
+  }catch(e){
+    console.error(e);
+    setStatus("fs","bad","ошибка");
+    toast("Firestore: проверь Rules и доступ к проекту");
+  }
+}
+loadProfile();
+showPrivatePeopleScreen();
+renderPeople();
+boot().finally(()=>{
+  if(profile.username){
+    /* Existing account: open app immediately, without registration screen. */
+    $("authScreen").classList.add("leaving");
+    openPage("chats");
+  }else{
+    showAuth();
+  }
+});
+
+/* ---------- optional theme + internet font settings ---------- */
+const themePresets={
+ dark:{"--bg":"#09080d","--surface":"#17151d","--surface2":"#211e29","--line":"#302c38","--text":"#f5f1fa","--muted":"#aaa4b2","--accent":"#c9a8ff","--accent2":"#9b6cff"},
+ light:{"--bg":"#f5f3f8","--surface":"#ffffff","--surface2":"#eeebf2","--line":"#d9d4df","--text":"#211d28","--muted":"#706a78","--accent":"#8b5cf6","--accent2":"#6d28d9"},
+ midnight:{"--bg":"#050b18","--surface":"#0d1728","--surface2":"#132238","--line":"#243653","--text":"#edf5ff","--muted":"#91a6c2","--accent":"#69b7ff","--accent2":"#397eea"},
+ ocean:{"--bg":"#061416","--surface":"#0c2022","--surface2":"#123033","--line":"#24494b","--text":"#effffd","--muted":"#91b8b8","--accent":"#65e6d1","--accent2":"#1ca99a"}
+};
+const fontUrls={
+ Manrope:"https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap",
+ Inter:"https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",
+ Roboto:"https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap",
+ Nunito:"https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap",
+ Montserrat:"https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap",
+ Rubik:"https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&display=swap",
+ "Playfair Display":"https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&display=swap"
+};
+function loadInternetFont(name){
+ const id="solarFont-"+name.replace(/\W/g,"");
+ if(document.getElementById(id))return;
+ const link=document.createElement("link");link.id=id;link.rel="stylesheet";link.href=fontUrls[name];document.head.appendChild(link);
+}
+function applyTheme(name,save=true){
+ const requestedTheme=name;
+ if(name==="system") name=window.matchMedia("(prefers-color-scheme: light)").matches?"light":"dark";
+ const preset=themePresets[name]||themePresets.dark;
+ Object.entries(preset).forEach(([k,v])=>document.documentElement.style.setProperty(k,v));
+ document.querySelectorAll(".theme-choice, .settings-theme").forEach(b=>b.classList.remove("active"));
+ const b=document.getElementById("theme"+name.charAt(0).toUpperCase()+name.slice(1)+"Btn");if(b)b.classList.add("active");
+ const sb=document.getElementById("settingsTheme"+name.charAt(0).toUpperCase()+name.slice(1));if(sb)sb.classList.add("active");
+ const sys=document.getElementById("settingsThemeSystem");if(sys && requestedTheme==="system")sys.classList.add("active");
+ if(save)localStorage.setItem("solarchat_theme",requestedTheme);
+}
+function applyFont(name,save=true){
+ if(!fontUrls[name])name="Manrope";loadInternetFont(name);
+ document.documentElement.style.setProperty("--solar-font",`"${name}",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif`);
+ if($("fontSelect"))$("fontSelect").value=name;if($("settingsFontSelect"))$("settingsFontSelect").value=name;if(save)localStorage.setItem("solarchat_font",name);
+}
+applyTheme(localStorage.getItem("solarchat_theme")||"dark",false);
+applyFont(localStorage.getItem("solarchat_font")||"Manrope",false);
+
+$("settingsFontSelect").onchange=e=>applyFont(e.target.value);
+$("settingsThemeSystem").onclick=()=>applyTheme("system");
+$("settingsThemeDark").onclick=()=>applyTheme("dark");
+$("settingsThemeLight").onclick=()=>applyTheme("light");
+$("settingsThemeMidnight").onclick=()=>applyTheme("midnight");
+$("settingsThemeOcean").onclick=()=>applyTheme("ocean");
+$("resetSettingsBtn").onclick=()=>{localStorage.removeItem("solarchat_theme");localStorage.removeItem("solarchat_font");applyTheme("dark");applyFont("Manrope");toast("Настройки сброшены");};
+window.matchMedia("(prefers-color-scheme: light)").addEventListener("change",()=>{if(localStorage.getItem("solarchat_theme")==="system")applyTheme("system",false);});
+
+</script>
+
+<!-- Added: edge blur for long message/user lists. Existing HTML/JS unchanged. -->
+<style>
+.messages:has(> .message:nth-child(12)),
+.people:has(> .person:nth-child(12)) {
+  position: relative;
+  overflow: auto;
+  isolation: isolate;
+}
+
+.messages:has(> .message:nth-child(12))::before,
+.people:has(> .person:nth-child(12))::before,
+.messages:has(> .message:nth-child(12))::after,
+.people:has(> .person:nth-child(12))::after {
+  content: '';
+  position: sticky;
+  display: block;
+  z-index: 10;
+  left: 0;
+  right: 0;
+  height: 42px;
+  margin: 0;
+  pointer-events: none;
+}
+
+.messages:has(> .message:nth-child(12))::before,
+.people:has(> .person:nth-child(12))::before {
+  top: 0;
+  margin-bottom: -42px;
+  background: linear-gradient(to bottom, var(--bg) 0%, transparent 100%);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 100%);
+}
+
+.messages:has(> .message:nth-child(12))::after,
+.people:has(> .person:nth-child(12))::after {
+  bottom: 0;
+  margin-top: -42px;
+  background: linear-gradient(to top, var(--bg) 0%, transparent 100%);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  mask-image: linear-gradient(to top, #000 0%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to top, #000 0%, transparent 100%);
+}
+</style>
+
+</body>
+</html>
